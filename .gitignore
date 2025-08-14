@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+
+# Virtual environments
+.conda/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyTorch
+*.pth
+*.pt
+
+# Data files
+data/
+data_subset/
+*.npy
+*.jpg
+
+# Model outputs
+splits.json
+vis_*.png
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+tensorboard_logs/
+runs/*
