@@ -99,7 +99,7 @@ Combinations that effectively capture all properties:
 - Fusion: Concat + linear (1024->256) + dropout + head to 10 params (center, dims, quat normalized).[1][2]
 - Inputs: Per-object RGB crops (B x 3 x 224 x 224), points (B x 1024 x 3).
 
-Why this? Fusion balances modalities (RGB for context, points for 3D)—ResNet proven for vision, PointNet lightweight for points. Quat output avoids gimbal lock. Per-object design handles variable N efficiently.
+Reasoning:Fusion balances modalities (RGB for context, points for 3D)—ResNet proven for vision, PointNet lightweight for points. Quat output avoids gimbal lock. Per-object design handles variable N efficiently.
 
 ## Training
 
@@ -109,17 +109,24 @@ Splits data (80/10/10), uses `BBoxDataset` with augs (toggled via flags, prob=0.
 
 Hyper-params (config.py): EPOCHS=5, BATCH=16, MAX_POINTS=1024—small for quick iterations on limited data.
 
-Why? Accum/scheduler prevent overfitting; detailed logging tracks components (e.g., high quat loss -> enable rot aug). Multi-model training via dict weights compares losses.
+Reasoning: Accum/scheduler prevent overfitting; detailed logging tracks components (e.g., high quat loss -> enable rot aug). Multi-model training via dict weights compares losses.
 
 Example Log:
 ```
-Training iou with loss weights: {'center': 0.0, 'diag': 0.0, 'quat': 0.0, 'canonical': 0.0, 'corner': 0.0, 'iou': 1.0}
+Train dataset size: 160, Val dataset size: 20
+Train loader length: 10, Val loader length: 2
 
-Epoch 1/5 - Batch 0/10 - Train Loss: 0.00 - Val Loss: 1.0000
-- Losses: {'center': 0.0, 'diag': 0.0, 'quat': 0.0, 'canonical': 0.0, 'corner': 0.0, 'iou': 0.6325}
+Resumed from epoch 5
+
+Epoch 6/10 - Batch 0/10 - Train Loss: 0.1711 - Val Loss: 1.6785
+- Losses: {'center': 1.4943273663520813, 'diag': 3.064611554145813, 'quat': 0.5378780663013458, 'canonical': 0.0, 'corner': 0.0, 'iou': 0.0}
 ...
 
-Epoch 1/5 - Avg Train Loss: 0.5000 - Avg Val Loss: 1.0000
+Epoch 6/10 - Batch 9/10 - Train Loss: 0.8776
+- Losses: {'center': 0.9324046969413757, 'diag': 1.1189152002334595, 'quat': 0.5633459091186523, 'canonical': None, 'corner': None, 'iou': None}
+
+Epoch 6/10 - Avg Train Loss: 0.4639 - Avg Val Loss: 4.1202
+
 Saved best model
 ```
 
@@ -127,15 +134,13 @@ Saved best model
 
 [src/eval.py](src/eval.py)
 
-Loads best model, computes avg total + component losses on test set (e.g., center error, quat angle, IoU). Optional batch viz of pred/gt bboxes on points.
+Loads best model, computes avg total + component losses on test set (e.g., center error, quat angle, IoU). Optional batch visualization of pred/gt bboxes on points.
 
-Metrics: Chosen for diagnostics—e.g., canonical loss verifies symmetry handling.
-
-Why? Aligns with training losses; viz verifies qualitative accuracy (e.g., overlaps indicate good predictions).
 
 Example Output:
 ```
 Evaluating canonical with loss weights: {'center': 0.3, 'diag': 0.1, 'quat': 0.0, 'canonical': 0.6, 'corner': 0.0, 'iou': 0.0}
+
 Avg Losses: {'center': 2.9870, 'diag': 1.1964, 'quat': 0.0, 'canonical': 1.0838, 'corner': 0.0, 'iou': 0.0}
 ```
 
@@ -145,10 +150,7 @@ Avg Losses: {'center': 2.9870, 'diag': 1.1964, 'quat': 0.0, 'canonical': 1.0838,
 
 - Raw: Image + masks; 3D points + bboxes (colored per object).
 - Processed: Cropped RGB; points + GT bbox.
-- Results: Points + pred (green) vs GT (red) bboxes.
-- Loss Breakdown: Bar charts per-sample (e.g., corner loss).
-
-Why? Verifies pipeline (e.g., aug effects in processed viz); saved PNGs aid debugging (e.g., misaligned bboxes highlight rotation issues).
+- Results: Points + pred (green) vs GT (red) bboxes. 
 
 Examples (descriptions; see vis_* folders):
 - Raw: Cluttered scene with multi-colored masks/bboxes.
@@ -177,9 +179,10 @@ Examples (descriptions; see vis_* folders):
 
 ## Status & Next Steps
 
-Completely implemented, but doesn't work well yet, needs more work.
+Current results show promising convergence; next: longer training for refinement with more detailed analysis of training logs for hyperparameter tuning and more detailed testing of loss functions.
 
-Next steps:
-- Train for longer
-- Analyze training logs in details to fine-tune the loss functions and hyperparameters
-- More detailed testing of loss functions
+## Testing
+
+- [src/test/test_augmentations.py](src/test/test_augmentations.py)
+- [src/test/test_dataset.py](src/test/test_dataset.py)
+- [src/test/test_losses.py](src/test/test_losses.py)
