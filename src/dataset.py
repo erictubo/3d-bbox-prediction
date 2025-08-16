@@ -1,3 +1,13 @@
+"""
+3D Bounding Box Dataset
+
+This module converts and augments raw data into processed batches.
+Input: raw data (image + masks + point cloud + bboxes)
+Output: processed data (rgb crop + points + bbox)
+
+Testing in test_dataset.py
+"""
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
@@ -6,30 +16,45 @@ import torchvision.transforms as T
 import albumentations as A
 import random
 
-from src.utils.data_utils import crop_and_resize_rgb, apply_flip, apply_z_rotation, apply_xy_translation, params_from_corners_quat
+from src.utils.augmentation import crop_and_resize_rgb, apply_mask_context, apply_flip, apply_xy_translation, apply_z_rotation, apply_scale
+from src.utils.bbox_conversion import params_from_corners_quat
 
-# TODO:
-# - rotation - fix + probably before crop
-# - flipping
 
 class BBoxDataset(Dataset):
-    def __init__(self, data_paths, max_points=1024, crop_size=(224, 224), aug_prob=0.5):
+    def __init__(self, data_paths, max_points=1024, crop_size=(224, 224), mask_context=5,
+                 aug_prob=0.5, aug_flip=False, aug_trans=True, aug_rot=False, aug_scale=True):
         """
         data_paths: list of dicts, each {'image': str, 'mask': str, 'pc': str, 'bbox': str}
-        aug_prob: Probability to apply augmentations (0.5 default).
+        max_points: Maximum number of points to sample per object.
+        crop_size:  (W, H) Size of the cropped RGB image.
+        mask_context: Size of the dilated mask to add context.
+        aug_prob: Probability to apply any augmentation (0.5 default).
+        aug_flip: Whether to apply flip augmentation.
+        aug_trans: Whether to apply translation augmentation.
+        aug_rot: Whether to apply z rotation augmentation.
+        aug_scale: Whether to apply scale augmentation.
         """
         self.data_paths = data_paths
         self.max_points = max_points
         self.crop_size = crop_size
+        self.mask_context = mask_context
+
         self.aug_prob = aug_prob
+        self.aug_flip = aug_flip
+        self.aug_trans = aug_trans
+        self.aug_rot = aug_rot
+        self.aug_scale = aug_scale
         
-        self.transform = T.Compose([T.ToTensor(), T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+        self.transform = T.Compose([
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
 
         # Albumentations for RGB (applied to crops)
         self.rgb_aug = A.Compose([
-            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
-            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.5)  # Added for variance
-        ], p=1.0)  # Apply with probability 1, but internals have probs
+                A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
+                A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.5)  # Added for variance
+            ], p=1.0)  # Apply with probability 1, but internals have probs
 
     def __len__(self):
         return len(self.data_paths)
@@ -52,6 +77,10 @@ class BBoxDataset(Dataset):
             mask = masks[i]  # (H, W)
             gt_bbox_corners = gt_bboxes[i]  # (8, 3)
 
+            # Dilate mask for context
+            if self.mask_context > 0:
+                mask = apply_mask_context(mask, self.mask_context)
+
             # Extract masked points (filter pc where mask > 0)
             masked_idx = np.where(mask.flatten() > 0)[0]
             masked_points = pc[masked_idx]  # (M, 3)
@@ -68,7 +97,7 @@ class BBoxDataset(Dataset):
             masked_points_t = torch.from_numpy(masked_points).float()
 
             # Apply flip
-            if random.random() < 0.5:
+            if self.aug_flip and random.random() < self.aug_prob:
                 flip_type = random.choice(['horizontal', 'vertical'])
                 crop, masked_points_t, gt_bbox_corners = apply_flip(
                     crop, masked_points_t, gt_bbox_corners, flip_type
@@ -79,15 +108,18 @@ class BBoxDataset(Dataset):
 
             # Apply augmentations with probability
             if random.random() < self.aug_prob:
-
-                # X/Y Translation
-                shift_x = random.uniform(-0.15, 0.15)
-                shift_y = random.uniform(-0.15, 0.15)
-                masked_points_t, target_params_t = apply_xy_translation(masked_points_t, target_params_t, shift_x, shift_y)
+                if self.aug_trans:
+                    shift_x = random.uniform(-0.15, 0.15)
+                    shift_y = random.uniform(-0.15, 0.15)
+                    masked_points_t, target_params_t = apply_xy_translation(masked_points_t, target_params_t, shift_x, shift_y)
                 
-                # # Z-Rotation - doesn't make sense because the bounding box does not update
-                # angle_z = random.uniform(-30, 30)  # Degrees
-                # crop, masked_points_t, target_params_t = apply_z_rotation(crop, masked_points_t, target_params_t, angle_z)
+                if self.aug_rot:
+                    angle_z = random.uniform(-30, 30)  # Degrees
+                    crop, masked_points_t, target_params_t = apply_z_rotation(crop, masked_points_t, target_params_t, angle_z)
+                
+                if self.aug_scale:  # New: Scale aug
+                    factor = random.uniform(0.8, 1.2)
+                    masked_points_t, target_params_t = apply_scale(masked_points_t, target_params_t, factor)
 
             # Apply RGB augmentations (non-geometric)
             crop_np = np.array(crop)

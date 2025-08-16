@@ -1,6 +1,15 @@
+"""
+3D Bounding Box Prediction Model
+
+This module implements a multi-modal model for 3D bounding box prediction.
+It uses a ResNet for RGB features and a PointNet for point cloud features,
+and fuses them using a linear layer.
+"""
+
 import torch
 import torch.nn as nn
 from torchvision.models import resnet18, ResNet18_Weights  # Pre-trained RGB backbone
+
 
 class PointNetBackbone(nn.Module):
     """Simple PointNet for point cloud feature extraction."""
@@ -53,4 +62,3 @@ class ThreeDBBoxModel(nn.Module):
         preds = torch.cat([raw_preds[:, :6], quat], dim=1)  # (B, 10)
         
         return preds
-

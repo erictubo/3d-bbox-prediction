@@ -8,18 +8,21 @@ __pycache__/
 .ipynb_checkpoints
 
 # PyTorch
+models/
 *.pth
 *.pt
 
 # Data files
 data/
-data_subset/
 *.npy
 *.jpg
 
 # Model outputs
 splits.json
-vis_*.png
+
+# Visualizations
+vis/
+*.png
 
 # IDE
 .vscode/
@@ -31,4 +34,4 @@ vis_*.png
 # Logs
 *.log
 tensorboard_logs/
-runs/*
+runs/
