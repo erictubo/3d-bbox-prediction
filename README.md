@@ -1,5 +1,20 @@
 # 3D Bounding Box Prediction
 
+Complete implementation with all required components (preprocessing, data loading, custom multimodal model and hybrid losses, train/eval loops, unit tests, and ONNX export) in a well-structured repository. Custom choices include 3D bounding box parametrization using center/dimensions/quaternions, canonical losses for symmetry handling, and consistent multimodal augmentations—detailed in README with justifications.
+
+After limited testing with several loss functions (constrained by time and compute), it shows promising convergence but does not perform well yet and needs further tuning based on training/validation logs (already available). See README for loss metrics and example outputs.
+
+Main files:
+- README.md: Documentation of approach, architecture/loss choices, metrics, and visualizations.
+/src: Python scripts for core functionality (e.g., dataset.py, model.py, train.py, eval.py, utilities, tests).
+
+Additional files:
+/runs: Training and validation logs from TensorBoard logger.
+/models: Best models for different loss configurations (see main.py for definitions) after 5 epochs.
+/vis: Visualizations of raw data, processed data, and evaluation results.
+
+Run main.py to reproduce training/evaluation.
+
 **Contents**
 - [Data Processing, Augmentation, & Parametrization](#data-processing-augmentation--parametrization)
 - [Loss Functions](#loss-functions)
