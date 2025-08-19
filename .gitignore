@@ -8,12 +8,12 @@ __pycache__/
 .ipynb_checkpoints
 
 # PyTorch
-models/
+models/*
 *.pth
 *.pt
 
 # Data files
-data/
+data/*
 *.npy
 *.jpg
 
@@ -21,8 +21,8 @@ data/
 splits.json
 
 # Visualizations
-vis/
-*.png
+vis/*/*
+
 
 # IDE
 .vscode/
@@ -34,4 +34,4 @@ vis/
 # Logs
 *.log
 tensorboard_logs/
-runs/
+runs/*
